@@ -18,9 +18,9 @@ use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::{LogOptions, ggml_time_us, send_logs_to_tracing};
+use tracing::{debug, info, trace};
 
 use std::ffi::CString;
-use std::io::Write;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::pin::pin;
@@ -50,6 +50,7 @@ pub struct LlamaParams {
     pub threads_batch: Option<i32>,
     /// size of the prompt context (default: loaded from the model)
     pub ctx_size: Option<NonZeroU32>,
+    // do not put verbose flag bc the binary should init logger
 }
 
 impl Default for LlamaParams {
@@ -167,7 +168,10 @@ pub fn run_llama(params: LlamaParams) -> Result<()> {
     let n_cxt = ctx.n_ctx() as i32;
     let n_kv_req = tokens_list.len() as i32 + (n_len - tokens_list.len() as i32);
 
-    eprintln!("n_len = {n_len}, n_ctx = {n_cxt}, k_kv_req = {n_kv_req}");
+    info!(
+        "n_len = {}, n_ctx = {}, k_kv_req = {}",
+        n_len, n_cxt, n_kv_req
+    );
 
     // make sure the KV cache is big enough to hold all the prompt and generated tokens
     if n_kv_req > n_cxt {
@@ -181,14 +185,12 @@ either reduce n_len or increase n_ctx"
         bail!("the prompt is too long, it has more tokens than n_len")
     }
 
-    // print the prompt token-by-token
-    eprintln!();
-
+    // log the prompt token-by-token
+    let mut prompt_text = String::new();
     for token in &tokens_list {
-        eprint!("{}", model.token_to_str(*token, Special::Tokenize)?);
+        prompt_text.push_str(&model.token_to_str(*token, Special::Tokenize)?);
     }
-
-    std::io::stderr().flush()?;
+    debug!("Prompt: {}", prompt_text);
 
     // create a llama_batch with size 512
     // we use this object to submit token data for decoding
@@ -228,7 +230,7 @@ either reduce n_len or increase n_ctx"
 
             // is it an end of stream?
             if model.is_eog_token(token) {
-                eprintln!();
+                debug!("End of generation token detected");
                 break;
             }
 
@@ -236,8 +238,7 @@ either reduce n_len or increase n_ctx"
             // use `Decoder.decode_to_string()` to avoid the intermediate buffer
             let mut output_string = String::with_capacity(93);
             let _decode_result = decoder.decode_to_string(&output_bytes, &mut output_string, false);
-            print!("{output_string}");
-            std::io::stdout().flush()?;
+            trace!("Generated token: {}", output_string);
 
             batch.clear();
             batch.add(token, n_cur, &[0], true)?;
@@ -250,20 +251,18 @@ either reduce n_len or increase n_ctx"
         n_decode += 1;
     }
 
-    eprintln!("\n");
-
     let t_main_end = ggml_time_us();
 
     let duration = Duration::from_micros((t_main_end - t_main_start) as u64);
 
-    eprintln!(
-        "decoded {} tokens in {:.2} s, speed {:.2} t/s\n",
+    info!(
+        "decoded {} tokens in {:.2} s, speed {:.2} t/s",
         n_decode,
         duration.as_secs_f32(),
         n_decode as f32 / duration.as_secs_f32()
     );
 
-    println!("{}", ctx.timings());
+    debug!("Timings: {}", ctx.timings());
 
     Ok(())
 }
