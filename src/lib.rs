@@ -88,6 +88,7 @@ pub fn parse_key_val(s: &str) -> Result<(String, ParamOverrideValue)> {
 }
 
 #[allow(clippy::too_many_lines)]
+#[tracing::instrument]
 pub fn run_llama(params: LlamaParams) -> Result<()> {
     let LlamaParams {
         n_len,
@@ -103,7 +104,7 @@ pub fn run_llama(params: LlamaParams) -> Result<()> {
         disable_gpu,
     } = params;
 
-    send_logs_to_tracing(LogOptions::default().with_logs_enabled(true));
+    send_logs_to_tracing(LogOptions::default().with_logs_enabled(false));
 
     // init LLM
     let backend = LlamaBackend::init()?;
@@ -202,7 +203,6 @@ either reduce n_len or increase n_ctx"
         let is_last = i == last_index;
         batch.add(token, i, &[0], is_last)?;
     }
-
     ctx.decode(&mut batch)
         .with_context(|| "llama_decode() failed")?;
 

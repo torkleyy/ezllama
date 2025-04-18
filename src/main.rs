@@ -6,9 +6,9 @@ use tracing_subscriber::EnvFilter;
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .or_else(|_| EnvFilter::try_new("info"))
-                .unwrap(),
+            EnvFilter::builder()
+                .with_default_directive(tracing::Level::DEBUG.into())
+                .from_env_lossy(),
         )
         .event_format(
             tracing_subscriber::fmt::format::format()
