@@ -32,9 +32,7 @@ pub struct LlamaParams {
     /// The path to the model
     pub model_path: PathBuf,
     /// The prompt
-    pub prompt: Option<String>,
-    /// Read the prompt from a file
-    pub file: Option<String>,
+    pub prompt: String,
     /// set the length of the prompt + output in tokens
     pub n_len: i32,
     /// override some parameters of the model
@@ -57,8 +55,7 @@ impl Default for LlamaParams {
     fn default() -> Self {
         Self {
             model_path: PathBuf::new(),
-            prompt: None,
-            file: None,
+            prompt: "Hello!".to_owned(),
             n_len: 32,
             key_value_overrides: Vec::new(),
             #[cfg(any(feature = "cuda", feature = "vulkan"))]
@@ -94,7 +91,6 @@ pub fn run_llama(params: LlamaParams) -> Result<()> {
         n_len,
         model_path,
         prompt,
-        file,
         key_value_overrides,
         seed,
         threads,
@@ -120,17 +116,6 @@ pub fn run_llama(params: LlamaParams) -> Result<()> {
         #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
         let params = LlamaModelParams::default();
         params
-    };
-
-    let prompt = if let Some(str) = prompt {
-        if file.is_some() {
-            bail!("either prompt or file must be specified, but not both")
-        }
-        str
-    } else if let Some(file) = file {
-        std::fs::read_to_string(&file).map_err(|e| anyhow!("unable to read {}: {}", file, e))?
-    } else {
-        "Hello my name is".to_string()
     };
 
     let mut model_params = pin!(model_params);

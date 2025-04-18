@@ -21,7 +21,7 @@ fn main() -> Result<()> {
 
     let params = LlamaParams {
         model_path: PathBuf::from("/Users/thomas/models/llm/gemma-1.1-7b-it.Q4_K_M.gguf"),
-        prompt: Some("Rust is the".to_string()),
+        prompt: "Rust is the".to_string(),
         n_len: 32,
         ..Default::default()
     };
