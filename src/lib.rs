@@ -13,10 +13,10 @@ use lazy_static::lazy_static;
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::{AddBos, Special};
+use llama_cpp_2::model::{LlamaChatMessage, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::{LogOptions, ggml_time_us, send_logs_to_tracing};
 use tracing::{debug, info, trace};
@@ -62,6 +62,7 @@ pub struct ChatMessage {
 pub enum ChatTemplateFormat {
     /// Use the template embedded in the model
     ModelDefault,
+    Default,
     /// Custom template
     Custom(String),
 }
@@ -103,6 +104,24 @@ impl<'a> ChatSession<'a> {
         // Format the chat messages into a prompt
         let formatted_prompt = match &self.template_format {
             ChatTemplateFormat::ModelDefault => {
+                // Use the model's default template
+                let template = self.model.model.get_chat_template()?;
+                let chat: Vec<_> = self
+                    .messages
+                    .iter()
+                    .map(|message| {
+                        LlamaChatMessage::new(
+                            message.role.as_str().to_string(),
+                            message.content.clone(),
+                        )
+                        .unwrap()
+                    })
+                    .collect();
+                self.model
+                    .model
+                    .apply_chat_template(&template, &chat, true)?
+            }
+            ChatTemplateFormat::Default => {
                 // Create a simple prompt format
                 let mut prompt = String::new();
                 for message in &self.messages {
