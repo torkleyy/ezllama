@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         )
         .init();
 
-    // Example 2: Using the model wrapper for repeated use
+    // Initialize the model
     let model_params = ModelParams {
         model_path: PathBuf::from("arcee-agent.Q4_1.gguf"),
         ..Default::default()
@@ -27,12 +27,33 @@ fn main() -> Result<()> {
 
     let mut model = Model::new(&model_params)?;
 
-    // Generate text multiple times with the same model
+    /*
+    // Example 1: Simple text completion
+    println!("\n=== Example 1: Text Completion ===\n");
     let output1 = model.generate("Once upon a time", 128)?;
-    println!("First generation: {}", output1);
+    println!("Text completion: {}\n", output1);
 
-    let output2 = model.generate(". End of story. Now let's talk about programming.", 64)?;
-    println!("Second generation: {}", output2);
+    // Example 2: Single message chat completion
+    println!("\n=== Example 2: Single Message Chat ===\n");
+    let chat_output = model.chat_completion("What is Rust programming language?", 256)?;
+    println!("Chat response: {}\n", chat_output);
+     */
+
+    // Example 3: Multi-turn conversation with default template
+    println!("\n=== Example 3: Multi-turn Conversation (Default Template) ===\n");
+    let mut chat_session = model.create_chat_session();
+
+    // First turn
+    chat_session.add_user_message("Hello, can you introduce yourself?");
+    let response1 = chat_session.prompt(128)?;
+    println!("User: Hello, can you introduce yourself?");
+    println!("Assistant: {}\n", response1);
+
+    // Second turn
+    chat_session.add_user_message("What can you help me with?");
+    let response2 = chat_session.prompt(128)?;
+    println!("User: What can you help me with?");
+    println!("Assistant: {}\n", response2);
 
     Ok(())
 }

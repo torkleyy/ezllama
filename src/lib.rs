@@ -1,4 +1,4 @@
-//! This is a translation of simple.cpp in llama.cpp using llama-cpp-2.
+//! This is a translation of simple.cpp and simple-chat.cpp in llama.cpp using llama-cpp-2.
 #![allow(
     clippy::cast_possible_wrap,
     clippy::cast_possible_truncation,
@@ -28,6 +28,119 @@ use std::pin::pin;
 use std::str::FromStr;
 
 use std::time::Duration;
+
+/// Role for a chat message (user or assistant)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChatRole {
+    /// User message
+    User,
+    /// Assistant message
+    Assistant,
+}
+
+impl ChatRole {
+    /// Convert the role to a string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ChatRole::User => "user",
+            ChatRole::Assistant => "assistant",
+        }
+    }
+}
+
+/// A single message in a chat conversation
+#[derive(Debug, Clone)]
+pub struct ChatMessage {
+    /// The role of the message sender (user or assistant)
+    pub role: ChatRole,
+    /// The content of the message
+    pub content: String,
+}
+
+/// Chat template format for different models
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChatTemplateFormat {
+    /// Use the template embedded in the model
+    ModelDefault,
+    /// Custom template
+    Custom(String),
+}
+
+/// A chat session containing a sequence of messages
+pub struct ChatSession<'a> {
+    /// The messages in the conversation
+    pub messages: Vec<ChatMessage>,
+    /// The chat template format to use
+    pub template_format: ChatTemplateFormat,
+    /// Reference to the model
+    model: &'a mut Model,
+}
+
+impl<'a> ChatSession<'a> {
+    /// Add a user message to the chat session
+    pub fn add_user_message(&mut self, content: &str) {
+        self.messages.push(ChatMessage {
+            role: ChatRole::User,
+            content: content.to_string(),
+        });
+    }
+
+    /// Add an assistant message to the chat session
+    pub fn add_assistant_message(&mut self, content: &str) {
+        self.messages.push(ChatMessage {
+            role: ChatRole::Assistant,
+            content: content.to_string(),
+        });
+    }
+
+    /// Get the last message in the chat session
+    pub fn last_message(&self) -> Option<&ChatMessage> {
+        self.messages.last()
+    }
+
+    /// Generate a response to the conversation
+    pub fn prompt(&mut self, n_len: i32) -> Result<String> {
+        // Format the chat messages into a prompt
+        let formatted_prompt = match &self.template_format {
+            ChatTemplateFormat::ModelDefault => {
+                // Create a simple prompt format
+                let mut prompt = String::new();
+                for message in &self.messages {
+                    prompt.push_str(&format!(
+                        "<|{}|>\n{}",
+                        message.role.as_str(),
+                        message.content
+                    ));
+                    prompt.push_str("\n");
+                }
+                prompt.push_str("<|assistant|>\n");
+                prompt
+            }
+            ChatTemplateFormat::Custom(template) => {
+                // Use the custom template
+                let mut prompt = template.clone();
+                for (i, message) in self.messages.iter().enumerate() {
+                    let role_placeholder = format!("{{{}_role}}", i);
+                    let content_placeholder = format!("{{{}_content}}", i);
+
+                    prompt = prompt.replace(&role_placeholder, message.role.as_str());
+                    prompt = prompt.replace(&content_placeholder, &message.content);
+                }
+                prompt
+            }
+        };
+
+        debug!("Chat prompt: {}", formatted_prompt);
+
+        // Generate the response
+        let response = self.model.generate(&formatted_prompt, n_len)?;
+
+        // Add the response to the chat session
+        self.add_assistant_message(&response);
+
+        Ok(response)
+    }
+}
 
 // Initialize the LlamaBackend globally
 lazy_static! {
@@ -221,6 +334,32 @@ impl Model {
         debug!("Timings: {}", self.ctx.timings());
 
         Ok(output)
+    }
+
+    /// Create a new chat session with this model
+    pub fn create_chat_session(&mut self) -> ChatSession {
+        ChatSession {
+            messages: Vec::new(),
+            template_format: ChatTemplateFormat::ModelDefault,
+            model: self,
+        }
+    }
+
+    /// Create a new chat session with a custom template
+    pub fn create_chat_session_with_template(&mut self, template: String) -> ChatSession {
+        ChatSession {
+            messages: Vec::new(),
+            template_format: ChatTemplateFormat::Custom(template),
+            model: self,
+        }
+    }
+
+    /// Generate a chat response for a single user message
+    /// This is a convenience method that creates a new chat session with a single user message
+    pub fn chat_completion(&mut self, user_message: &str, n_len: i32) -> Result<String> {
+        let mut session = self.create_chat_session();
+        session.add_user_message(user_message);
+        session.prompt(n_len)
     }
 }
 
