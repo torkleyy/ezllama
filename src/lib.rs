@@ -27,20 +27,19 @@ use std::path::PathBuf;
 use std::pin::pin;
 use std::str::FromStr;
 
-use std::sync::Arc;
 use std::time::Duration;
 
 // Initialize the LlamaBackend globally
 lazy_static! {
     static ref LLAMA_BACKEND: LlamaBackend = {
-        send_logs_to_tracing(LogOptions::default().with_logs_enabled(false));
+        send_logs_to_tracing(LogOptions::default().with_logs_enabled(true));
         LlamaBackend::init().expect("Failed to initialize LlamaBackend")
     };
 }
 
 /// A wrapper around LlamaModel and its context for efficient repeated use
 pub struct Model {
-    model: Arc<LlamaModel>,
+    model: LlamaModel,
     ctx: llama_cpp_2::context::LlamaContext<'static>,
     batch: LlamaBatch,
     decoder: encoding_rs::Decoder,
@@ -71,10 +70,8 @@ impl Model {
         }
 
         // Load the model
-        let model = Arc::new(
-            LlamaModel::load_from_file(&LLAMA_BACKEND, &params.model_path, &model_params)
-                .map_err(|e| anyhow!("unable to load model: {}", e))?,
-        );
+        let model = LlamaModel::load_from_file(&LLAMA_BACKEND, &params.model_path, &model_params)
+            .map_err(|e| anyhow!("unable to load model: {}", e))?;
 
         // Initialize the context
         let mut ctx_params = LlamaContextParams::default()
@@ -87,18 +84,18 @@ impl Model {
             ctx_params = ctx_params.with_n_threads_batch(threads_batch);
         }
 
-        // This is a workaround for the lifetime issue
-        // We're using 'static here because the model is wrapped in an Arc
-        // and the backend is a global static
+        // Create the context
+        // Note: We're using 'static lifetime because LLAMA_BACKEND is a static reference
+        // This is safe because the context will not outlive the model or the backend
+        let ctx_result = model.new_context(&LLAMA_BACKEND, ctx_params);
+        let ctx_with_lifetime = ctx_result.with_context(|| "unable to create the llama_context")?;
+
+        // This is safe because LLAMA_BACKEND is 'static and model lives as long as the context
         let ctx = unsafe {
             std::mem::transmute::<
                 llama_cpp_2::context::LlamaContext<'_>,
                 llama_cpp_2::context::LlamaContext<'static>,
-            >(
-                model
-                    .new_context(&LLAMA_BACKEND, ctx_params)
-                    .with_context(|| "unable to create the llama_context")?,
-            )
+            >(ctx_with_lifetime)
         };
 
         // Create a batch with size 512
@@ -116,11 +113,19 @@ impl Model {
     }
 
     /// Generate text from a prompt
-    pub fn generate(&mut self, prompt: &str, n_len: i32, seed: Option<u32>) -> Result<String> {
+    pub fn generate(&mut self, prompt: &str, n_len: i32) -> Result<String> {
+        let add_bos = self.ctx.get_kv_cache_used_cells() == 0;
         // Tokenize the prompt
         let tokens_list = self
             .model
-            .str_to_token(prompt, AddBos::Always)
+            .str_to_token(
+                prompt,
+                if add_bos {
+                    AddBos::Always
+                } else {
+                    AddBos::Never
+                },
+            )
             .with_context(|| format!("failed to tokenize {prompt}"))?;
 
         let n_cxt = self.ctx.n_ctx() as i32;
@@ -143,13 +148,6 @@ impl Model {
             bail!("the prompt is too long, it has more tokens than n_len")
         }
 
-        // Log the prompt token-by-token
-        let mut prompt_text = String::new();
-        for token in &tokens_list {
-            prompt_text.push_str(&self.model.token_to_str(*token, Special::Tokenize)?);
-        }
-        debug!("Prompt: {}", prompt_text);
-
         // Clear the batch and add tokens
         self.batch.clear();
 
@@ -171,10 +169,10 @@ impl Model {
 
         let t_main_start = ggml_time_us();
 
-        let mut sampler = LlamaSampler::chain_simple([
-            LlamaSampler::dist(seed.unwrap_or(1234)),
-            LlamaSampler::greedy(),
-        ]);
+        let mut sampler =
+            LlamaSampler::chain_simple([LlamaSampler::dist(1234), LlamaSampler::greedy()]);
+
+        let mut token_text = String::with_capacity(93);
 
         while n_cur <= n_len {
             // Sample the next token
@@ -190,11 +188,11 @@ impl Model {
 
             // Convert token to text and add to output
             let output_bytes = self.model.token_to_bytes(token, Special::Tokenize)?;
-            let mut token_text = String::with_capacity(93);
+            token_text.clear();
             let _decode_result =
                 self.decoder
                     .decode_to_string(&output_bytes, &mut token_text, false);
-            trace!("Generated token: {}", token_text);
+            trace!(name: "token-gen", "Generated token: {}", token_text);
             output.push_str(&token_text);
 
             // Prepare for next token
@@ -250,47 +248,6 @@ impl Default for ModelParams {
     fn default() -> Self {
         Self {
             model_path: PathBuf::new(),
-            key_value_overrides: Vec::new(),
-            #[cfg(any(feature = "cuda", feature = "vulkan"))]
-            disable_gpu: false,
-            seed: None,
-            threads: None,
-            threads_batch: None,
-            ctx_size: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LlamaParams {
-    /// The path to the model
-    pub model_path: PathBuf,
-    /// The prompt
-    pub prompt: String,
-    /// set the length of the prompt + output in tokens
-    pub n_len: i32,
-    /// override some parameters of the model
-    pub key_value_overrides: Vec<(String, ParamOverrideValue)>,
-    /// Disable offloading layers to the gpu
-    #[cfg(any(feature = "cuda", feature = "vulkan"))]
-    pub disable_gpu: bool,
-    /// RNG seed (default: 1234)
-    pub seed: Option<u32>,
-    /// number of threads to use during generation (default: use all available threads)
-    pub threads: Option<i32>,
-    /// number of threads to use during batch and prompt processing (default: use all available threads)
-    pub threads_batch: Option<i32>,
-    /// size of the prompt context (default: loaded from the model)
-    pub ctx_size: Option<NonZeroU32>,
-    // do not put verbose flag bc the binary should init logger
-}
-
-impl Default for LlamaParams {
-    fn default() -> Self {
-        Self {
-            model_path: PathBuf::new(),
-            prompt: "Hello!".to_owned(),
-            n_len: 32,
             key_value_overrides: Vec::new(),
             #[cfg(any(feature = "cuda", feature = "vulkan"))]
             disable_gpu: false,

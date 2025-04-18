@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ezllama::{LlamaParams, Model, ModelParams};
+use ezllama::{Model, ModelParams};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -19,18 +19,19 @@ fn main() -> Result<()> {
         )
         .init();
 
+    // Example 2: Using the model wrapper for repeated use
     let model_params = ModelParams {
-        model_path: PathBuf::from("/Users/thomas/models/llm/gemma-1.1-7b-it.Q4_K_M.gguf"),
+        model_path: PathBuf::from("arcee-agent.Q4_1.gguf"),
         ..Default::default()
     };
 
     let mut model = Model::new(&model_params)?;
 
     // Generate text multiple times with the same model
-    let output1 = model.generate("Rust is a", 32, None)?;
+    let output1 = model.generate("Once upon a time", 128)?;
     println!("First generation: {}", output1);
 
-    let output2 = model.generate("Python is a", 32, None)?;
+    let output2 = model.generate(". End of story. Now let's talk about programming.", 64)?;
     println!("Second generation: {}", output2);
 
     Ok(())
