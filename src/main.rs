@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ezllama::LlamaParams;
+use ezllama::{LlamaParams, Model, ModelParams};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -19,12 +19,19 @@ fn main() -> Result<()> {
         )
         .init();
 
-    let params = LlamaParams {
+    let model_params = ModelParams {
         model_path: PathBuf::from("/Users/thomas/models/llm/gemma-1.1-7b-it.Q4_K_M.gguf"),
-        prompt: "Rust is the".to_string(),
-        n_len: 32,
         ..Default::default()
     };
 
-    ezllama::run_llama(params)
+    let mut model = Model::new(&model_params)?;
+
+    // Generate text multiple times with the same model
+    let output1 = model.generate("Rust is a", 32, None)?;
+    println!("First generation: {}", output1);
+
+    let output2 = model.generate("Python is a", 32, None)?;
+    println!("Second generation: {}", output2);
+
+    Ok(())
 }

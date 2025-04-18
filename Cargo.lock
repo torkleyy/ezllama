@@ -197,6 +197,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "encoding_rs",
+ "lazy_static",
  "llama-cpp-2",
  "log",
  "serde",

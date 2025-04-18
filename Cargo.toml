@@ -16,6 +16,7 @@ tracing-subscriber = { version = "0.3", features = [
     "chrono",
     "local-time",
 ] }
+lazy_static = "1.5.0"
 
 [features]
 metal = ["llama-cpp-2/metal"]
