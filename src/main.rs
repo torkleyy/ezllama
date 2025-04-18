@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ezllama::{Model, ModelParams};
+use ezllama::{Model, ModelParams, Session};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -27,17 +27,20 @@ fn main() -> Result<()> {
 
     let mut model = Model::new(&model_params)?;
 
-    /*
-    // Example 1: Simple text completion
-    println!("\n=== Example 1: Text Completion ===\n");
-    let output1 = model.generate("Once upon a time", 128)?;
-    println!("Text completion: {}\n", output1);
+    // Example 1: Simple text completion using TextSession
+    println!("\n=== Example 1: Text Completion with TextSession ===\n");
+    let mut text_session = model.create_text_session();
+    let output1 = text_session.prompt("Once upon a time", 128)?;
+    println!("Prompt: Once upon a time");
+    println!("Completion: {}\n", output1);
 
-    // Example 2: Single message chat completion
-    println!("\n=== Example 2: Single Message Chat ===\n");
-    let chat_output = model.chat_completion("What is Rust programming language?", 256)?;
-    println!("Chat response: {}\n", chat_output);
-     */
+    // Example 2: Single message chat completion using ChatSession
+    println!("\n=== Example 2: Single Message Chat with ChatSession ===\n");
+    let mut chat_session = model.create_chat_session();
+    chat_session.add_user_message("What is Rust programming language?");
+    let chat_output = chat_session.generate(256)?;
+    println!("User: What is Rust programming language?");
+    println!("Assistant: {}\n", chat_output);
 
     // Example 3: Multi-turn conversation with default template
     println!("\n=== Example 3: Multi-turn Conversation (Default Template) ===\n");
@@ -45,13 +48,13 @@ fn main() -> Result<()> {
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
-    let response1 = chat_session.prompt(128)?;
+    let response1 = chat_session.generate(128)?;
     println!("User: Hello, can you introduce yourself?");
     println!("Assistant: {}\n", response1);
 
     // Second turn
     chat_session.add_user_message("What can you help me with?");
-    let response2 = chat_session.prompt(128)?;
+    let response2 = chat_session.generate(128)?;
     println!("User: What can you help me with?");
     println!("Assistant: {}\n", response2);
 

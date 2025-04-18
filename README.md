@@ -40,7 +40,7 @@ ezllama = { version = "0.1.0", features = ["vulkan"] }  # For Vulkan support
 ## Quick Start
 
 ```rust
-use ezllama::{Model, ModelParams};
+use ezllama::{Model, ModelParams, Session};
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
@@ -52,12 +52,15 @@ fn main() -> anyhow::Result<()> {
 
     let mut model = Model::new(&model_params)?;
 
-    // Simple text completion
-    let output = model.generate("Once upon a time", 128)?;
+    // Simple text completion using TextSession
+    let mut text_session = model.create_text_session_with_prompt("Once upon a time");
+    let output = text_session.generate(128)?;
     println!("Text completion: {}", output);
 
-    // Single message chat completion
-    let chat_output = model.chat_completion("What is Rust programming language?", 256)?;
+    // Single message chat completion using ChatSession
+    let mut chat_session = model.create_chat_session();
+    chat_session.add_user_message("What is Rust programming language?");
+    let chat_output = chat_session.generate(256)?;
     println!("Chat response: {}", chat_output);
 
     // Multi-turn conversation
@@ -65,12 +68,12 @@ fn main() -> anyhow::Result<()> {
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
-    let response1 = chat_session.prompt(128)?;
+    let response1 = chat_session.generate(128)?;
     println!("Assistant: {}", response1);
 
     // Second turn
     chat_session.add_user_message("What can you help me with?");
-    let response2 = chat_session.prompt(128)?;
+    let response2 = chat_session.generate(128)?;
     println!("Assistant: {}", response2);
 
     Ok(())
@@ -78,6 +81,19 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Advanced Usage
+
+### Session Types
+
+```rust
+// Create a text session for text completion
+let mut text_session = model.create_text_session();
+text_session.set_prompt("Once upon a time");
+let output = text_session.generate(128)?;
+
+// Append to the existing prompt for continuation
+text_session.append_prompt(" and then");
+let more_output = text_session.generate(128)?;
+```
 
 ### Custom Chat Templates
 
