@@ -50,30 +50,17 @@ fn main() -> Result<()> {
         ..Default::default()
     };
 
-    let mut model = Model::new(&model_params)?;
+    let model = Model::new(&model_params)?;
 
-    // Simple text completion using TextSession
-    let mut text_session = model.create_text_session_with_prompt("Once upon a time");
-    let output = text_session.generate(128)?;
-    println!("Text completion: {}", output);
-
-    // Single message chat completion using ChatSession
-    let mut chat_session = model.create_chat_session();
-    chat_session.add_user_message("What is Rust programming language?");
-    let chat_output = chat_session.generate(256)?;
-    println!("Chat response: {}", chat_output);
-
-    // Multi-turn conversation
-    let mut chat_session = model.create_chat_session();
+    let mut chat_session = model.create_chat_session(&model_params)?;
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
     let response1 = chat_session.generate(128)?;
     println!("Assistant: {}", response1);
 
-    // Second turn
-    chat_session.add_user_message("What can you help me with?");
-    let response2 = chat_session.generate(128)?;
+    // Second turn (can do the same in one step)
+    let response2 = chat_session.prompt("What can you help me with?", 128)?;
     println!("Assistant: {}", response2);
 
     Ok(())
@@ -82,17 +69,18 @@ fn main() -> Result<()> {
 
 ## Advanced Usage
 
-### Session Types
+### Text completion
+
+**Note:** Many models struggle with continuing from a second prompt
+in the same context.
 
 ```rust
 // Create a text session for text completion
-let mut text_session = model.create_text_session();
-text_session.set_prompt("Once upon a time");
-let output = text_session.generate(128)?;
+let mut text_session = model.create_text_session(&model_params)?;
+let output = text_session.prompt("Once upon a time", 128)?;
 
-// Append to the existing prompt for continuation
-text_session.append_prompt(" and then");
-let more_output = text_session.generate(128)?;
+// Continue generating from the existing context
+let more_output = text_session.prompt(" and then", 128)?;
 ```
 
 ### System Messages
@@ -125,20 +113,9 @@ let template = "{{0_role}}: {{0_content}}\n{{1_role}}: {{1_content}}";
 let mut chat_session = model.create_chat_session_with_template(template.to_string(), &model_params)?;
 ```
 
-### Model Parameters
-
-```rust
-let model_params = ModelParams {
-    model_path: PathBuf::from("path/to/your/model.gguf"),
-    threads: Some(4),                // Number of threads for generation
-    ctx_size: Some(NonZeroU32::new(4096).unwrap()), // Context size
-    ..Default::default()
-};
-```
-
 ## License
 
-Licensed under MIT.
+Dual-licensed under MIT and Apache 2.0.
 
 ## Contribution
 
