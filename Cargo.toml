@@ -1,6 +1,6 @@
 [package]
 name = "ezllama"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "An opinionated, simple Rust interface for local LLMs, powered by llama-cpp-2"
 license = "MIT"
