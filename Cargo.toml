@@ -9,7 +9,7 @@ documentation = "https://docs.rs/ezllama"
 readme = "README.md"
 keywords = ["llm", "ai", "llama", "language-model", "machine-learning"]
 categories = ["api-bindings", "science", "text-processing"]
-rust-version = "1.70.0"
+rust-version = "1.85.0"
 include = ["src/**/*", "examples/**/*", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
