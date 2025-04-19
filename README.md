@@ -12,7 +12,7 @@ An opinionated, simple Rust interface for local LLMs, powered by [llama-cpp-2](h
 
 - **Simple API**: Designed for ease of use with a clean, intuitive interface
 - **Text and Chat Completion**: Support for both text and chat completion tasks
-* **Infinite token generation**: Automatically manages the cache for infinite token generation
+- **Infinite token generation**: Automatically manages the cache for infinite token generation
 - **Tracing Integration**: Built-in logging via the tracing ecosystem
 
 Right now it only supports the basics, but I might add more features in the future
