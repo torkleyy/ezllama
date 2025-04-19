@@ -101,7 +101,7 @@ impl<'a> ChatSession<'a> {
             ));
         }
 
-        let start_index = self.start_index.min(self.messages.len() - 1);
+        let start_index = self.start_index.min(self.messages.len());
         let messages = &self.messages[start_index..];
 
         // Format the chat messages into a prompt
@@ -163,7 +163,7 @@ impl<'a> ChatSession<'a> {
 
         self.add_assistant_message(&response);
 
-        self.start_index = self.messages.len() - 1;
+        self.start_index = self.messages.len();
 
         Ok(response)
     }
