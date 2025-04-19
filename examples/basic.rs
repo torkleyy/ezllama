@@ -37,8 +37,7 @@ fn main() -> Result<()> {
     // Example 2: Single message chat completion using ChatSession
     println!("\n=== Example 2: Single Message Chat with ChatSession ===\n");
     let mut chat_session = model.create_chat_session(&model_params)?;
-    chat_session.add_user_message("What is Rust programming language?");
-    let chat_output = chat_session.generate(256)?;
+    let chat_output = chat_session.prompt("What is Rust programming language?", 128)?;
     println!("User: What is Rust programming language?");
     println!("Assistant: {}\n", chat_output);
 
@@ -53,8 +52,7 @@ fn main() -> Result<()> {
     println!("Assistant: {}\n", response1);
 
     // Second turn
-    chat_session.add_user_message("What can you help me with?");
-    let response2 = chat_session.generate(128)?;
+    let response2 = chat_session.prompt("What can you help me with?", 128)?;
     println!("User: What can you help me with?");
     println!("Assistant: {}\n", response2);
 
