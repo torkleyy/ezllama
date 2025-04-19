@@ -65,22 +65,31 @@ impl<'a> TextSession<'a> {
             )
             .map_err(|e| Error::TokenizationError(format!("failed to tokenize prompt: {}", e)))?;
 
-        let n_prompt_tokens = tokens_list.len() as i32;
+        let n_past = self.ctx.get_kv_cache_used_cells() as i32;
+        let n_prompt = tokens_list.len() as i32;
         let n_ctx = self.ctx.n_ctx() as i32;
-        let n_kv_req = n_prompt_tokens + num_tokens;
+        let n_kv_req = n_past + n_prompt + num_tokens;
 
         info!(
-            "num_tokens_to_generate = {}, n_ctx = {}, k_kv_req = {}",
-            num_tokens, n_ctx, n_kv_req
+            "num_tokens_to_generate = {}, n_prompt = {}, n_ctx = {}, k_kv_req = {}",
+            num_tokens, n_prompt, n_ctx, n_kv_req
         );
 
         // Make sure the KV cache is big enough
         if n_kv_req > n_ctx {
-            return Err(Error::KVCacheSizeError(
-                "n_kv_req > n_ctx, the required kv cache size is not big enough\n\
-                either reduce n_len or increase n_ctx"
-                    .to_string(),
-            ));
+            todo!("implement sliding context")
+            /*
+            let keep = n_past / 2;
+            if !self
+                .ctx
+                .clear_kv_cache_seq(None, Some(0), Some(keep as u32))
+                .unwrap()
+            {
+                return Err(Error::KVCacheSizeError(
+                    "failed to clear KV cache".to_string(),
+                ));
+            };
+            */
         }
 
         // Clear the batch and add tokens
@@ -120,7 +129,7 @@ impl<'a> TextSession<'a> {
 
         let mut token_text = String::with_capacity(93);
 
-        let n_len = n_prompt_tokens + num_tokens;
+        let n_len = n_prompt + num_tokens;
 
         while n_cur <= n_len {
             // Sample the next token
