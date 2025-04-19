@@ -196,7 +196,6 @@ impl Model {
 }
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct ModelParams {
     /// The path to the model
     pub model_path: PathBuf,
@@ -213,7 +212,8 @@ pub struct ModelParams {
     pub threads_batch: Option<i32>,
     /// size of the prompt context (default: loaded from the model)
     pub ctx_size: Option<NonZeroU32>,
-    // do not put verbose flag bc the binary should init logger
+    #[doc(hidden)]
+    pub _non_exhaustive: (),
 }
 
 impl Default for ModelParams {
@@ -227,6 +227,7 @@ impl Default for ModelParams {
             threads: None,
             threads_batch: None,
             ctx_size: None,
+            _non_exhaustive: (),
         }
     }
 }

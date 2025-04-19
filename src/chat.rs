@@ -129,7 +129,7 @@ impl<'a> ChatSession<'a> {
                         message.role.as_str(),
                         message.content
                     ));
-                    prompt.push_str("\n");
+                    prompt.push('\n');
                 }
 
                 // Add user and assistant messages in order
@@ -139,7 +139,7 @@ impl<'a> ChatSession<'a> {
                         message.role.as_str(),
                         message.content
                     ));
-                    prompt.push_str("\n");
+                    prompt.push('\n');
                 }
 
                 prompt.push_str("<|assistant|>\n");
