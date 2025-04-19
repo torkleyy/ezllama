@@ -6,7 +6,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
-An opinionated, simple Rust interface for local LLMs, powered by [llama-cpp-2](https://github.com/rustformers/llama-cpp-rs).
+An opinionated, simple Rust interface for local LLMs, powered by [llama-cpp-rs-2](https://github.com/utilityai/llama-cpp-rs).
 
 ## Features
 
