@@ -95,12 +95,34 @@ text_session.append_prompt(" and then");
 let more_output = text_session.generate(128)?;
 ```
 
+### System Messages
+
+```rust
+// Create a chat session with a system message
+let mut chat_session = model.create_chat_session_with_system(
+    "You are a helpful assistant that specializes in Rust programming.",
+    &model_params
+)?;
+
+// Or add a system message to an existing session
+let mut chat_session = model.create_chat_session(&model_params)?;
+chat_session.add_system_message("You are a helpful assistant.");
+
+// One-shot completion with system message
+let response = model.chat_completion_with_system(
+    "You are a concise assistant.",
+    "Explain quantum computing.",
+    256,
+    &model_params
+)?;
+```
+
 ### Custom Chat Templates
 
 ```rust
 // Create a chat session with a custom template
 let template = "{{0_role}}: {{0_content}}\n{{1_role}}: {{1_content}}";
-let mut chat_session = model.create_chat_session_with_template(template.to_string());
+let mut chat_session = model.create_chat_session_with_template(template.to_string(), &model_params)?;
 ```
 
 ### Model Parameters

@@ -104,6 +104,17 @@ impl Model {
         Ok(session)
     }
 
+    /// Create a new chat session with a system message
+    pub fn create_chat_session_with_system(
+        &self,
+        system_message: &str,
+        params: &ModelParams,
+    ) -> Result<ChatSession> {
+        let mut session = self.create_chat_session(params)?;
+        session.add_system_message(system_message);
+        Ok(session)
+    }
+
     /// Generate a chat response for a single user message
     /// This is a convenience method that creates a new chat session with a single user message
     pub fn chat_completion(
@@ -112,8 +123,21 @@ impl Model {
         num_tokens: i32,
         params: &ModelParams,
     ) -> Result<String> {
-        let mut session = self.create_chat_session(params)?;
-        session.prompt(user_message, num_tokens)
+        self.create_chat_session(params)?
+            .prompt(user_message, num_tokens)
+    }
+
+    /// Generate a chat response for a single user message with a system message
+    /// This is a convenience method that creates a new chat session with a system message and a user message
+    pub fn chat_completion_with_system(
+        &self,
+        system_message: &str,
+        user_message: &str,
+        num_tokens: i32,
+        params: &ModelParams,
+    ) -> Result<String> {
+        self.create_chat_session_with_system(system_message, params)?
+            .prompt(user_message, num_tokens)
     }
 
     /// Create a new text session

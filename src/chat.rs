@@ -10,6 +10,8 @@ pub enum ChatRole {
     User,
     /// Assistant message
     Assistant,
+    /// System message
+    System,
 }
 
 impl ChatRole {
@@ -18,6 +20,7 @@ impl ChatRole {
         match self {
             ChatRole::User => "user",
             ChatRole::Assistant => "assistant",
+            ChatRole::System => "system",
         }
     }
 }
@@ -69,6 +72,14 @@ impl<'a> ChatSession<'a> {
         });
     }
 
+    /// Add a system message to the chat session
+    pub fn add_system_message(&mut self, content: &str) {
+        self.messages.push(ChatMessage {
+            role: ChatRole::System,
+            content: content.to_string(),
+        });
+    }
+
     /// Get the last message in the chat session
     pub fn last_message(&self) -> Option<&ChatMessage> {
         self.messages.last()
@@ -110,7 +121,9 @@ impl<'a> ChatSession<'a> {
             ChatTemplateFormat::Default => {
                 // Create a simple prompt format
                 let mut prompt = String::new();
-                for message in &self.messages {
+
+                // Add system messages at the beginning
+                for message in self.messages.iter().filter(|m| m.role == ChatRole::System) {
                     prompt.push_str(&format!(
                         "<|{}|>\n{}",
                         message.role.as_str(),
@@ -118,6 +131,17 @@ impl<'a> ChatSession<'a> {
                     ));
                     prompt.push_str("\n");
                 }
+
+                // Add user and assistant messages in order
+                for message in self.messages.iter().filter(|m| m.role != ChatRole::System) {
+                    prompt.push_str(&format!(
+                        "<|{}|>\n{}",
+                        message.role.as_str(),
+                        message.content
+                    ));
+                    prompt.push_str("\n");
+                }
+
                 prompt.push_str("<|assistant|>\n");
                 prompt
             }
