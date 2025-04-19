@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     let env_filter = if verbose {
         // Enable detailed logging when verbose flag is present
         EnvFilter::builder()
-            .with_default_directive(Level::INFO.into())
+            .with_default_directive(Level::DEBUG.into())
             .from_env_lossy()
     } else {
         // Disable most logging by default

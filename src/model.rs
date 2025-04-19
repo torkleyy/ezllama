@@ -90,6 +90,7 @@ impl Model {
             messages: Vec::new(),
             template_format: ChatTemplateFormat::ModelDefault,
             session: TextSession::new_with_context(self, ctx, batch, decoder),
+            start_index: 0,
         })
     }
 

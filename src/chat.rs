@@ -51,6 +51,9 @@ pub struct ChatSession<'a> {
     pub messages: Vec<ChatMessage>,
     /// The chat template format to use
     pub template_format: ChatTemplateFormat,
+    /// The index of the first message in the conversation
+    /// that is not yet in the context
+    pub(crate) start_index: usize,
     /// Reference to the model
     pub(crate) session: TextSession<'a>,
 }
@@ -92,6 +95,15 @@ impl<'a> ChatSession<'a> {
 
     /// Generate a response to the conversation
     pub fn generate(&mut self, num_tokens: i32) -> Result<String> {
+        if self.messages.len() == 0 {
+            return Err(Error::ChatTemplateError(
+                "No messages in the chat session".to_string(),
+            ));
+        }
+
+        let start_index = self.start_index.min(self.messages.len() - 1);
+        let messages = &self.messages[start_index..];
+
         // Format the chat messages into a prompt
         let formatted_prompt = match &self.template_format {
             ChatTemplateFormat::ModelDefault => {
@@ -99,8 +111,7 @@ impl<'a> ChatSession<'a> {
                 let template = self.session.model.model.get_chat_template().map_err(|e| {
                     Error::ChatTemplateError(format!("Failed to get chat template: {}", e))
                 })?;
-                let chat: Vec<_> = self
-                    .messages
+                let chat: Vec<_> = messages
                     .iter()
                     .map(|message| {
                         LlamaChatMessage::new(
@@ -122,18 +133,7 @@ impl<'a> ChatSession<'a> {
                 // Create a simple prompt format
                 let mut prompt = String::new();
 
-                // Add system messages at the beginning
-                for message in self.messages.iter().filter(|m| m.role == ChatRole::System) {
-                    prompt.push_str(&format!(
-                        "<|{}|>\n{}",
-                        message.role.as_str(),
-                        message.content
-                    ));
-                    prompt.push('\n');
-                }
-
-                // Add user and assistant messages in order
-                for message in self.messages.iter().filter(|m| m.role != ChatRole::System) {
+                for message in messages {
                     prompt.push_str(&format!(
                         "<|{}|>\n{}",
                         message.role.as_str(),
@@ -162,6 +162,8 @@ impl<'a> ChatSession<'a> {
         let response = self.session.prompt(&formatted_prompt, num_tokens)?;
 
         self.add_assistant_message(&response);
+
+        self.start_index = self.messages.len() - 1;
 
         Ok(response)
     }

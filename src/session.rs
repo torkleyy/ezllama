@@ -88,6 +88,13 @@ impl<'a> TextSession<'a> {
 
         let last_index: i32 = (tokens_list.len() - 1) as i32;
         for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
+            if i > 0 && i % 512 == 0 {
+                self.ctx
+                    .decode(&mut self.batch)
+                    .map_err(|e| Error::DecodingError(format!("llama_decode() failed: {}", e)))?;
+                self.batch.clear();
+            }
+
             // llama_decode will output logits only for the last token of the prompt
             let is_last = i == last_index;
             self.batch
