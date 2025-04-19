@@ -40,10 +40,10 @@ ezllama = { version = "0.1.0", features = ["vulkan"] }  # For Vulkan support
 ## Quick Start
 
 ```rust
-use ezllama::{Model, ModelParams, Session};
+use ezllama::{Model, ModelParams, Result};
 use std::path::PathBuf;
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     // Initialize the model
     let model_params = ModelParams {
         model_path: PathBuf::from("path/to/your/model.gguf"),

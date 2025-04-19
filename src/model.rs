@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use crate::error::{Error, Result};
 use lazy_static::lazy_static;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::model::LlamaModel;
@@ -18,7 +18,9 @@ use crate::chat::{ChatSession, ChatTemplateFormat};
 lazy_static! {
     pub static ref LLAMA_BACKEND: LlamaBackend = {
         send_logs_to_tracing(LogOptions::default().with_logs_enabled(true));
-        LlamaBackend::init().expect("Failed to initialize LlamaBackend")
+        LlamaBackend::init()
+            .map_err(|e| Error::BackendInitError(e.to_string()))
+            .expect("Failed to initialize LlamaBackend")
     };
 }
 
@@ -47,13 +49,14 @@ impl Model {
 
         // Apply key-value overrides
         for (k, v) in &params.key_value_overrides {
-            let k = CString::new(k.as_bytes()).map_err(|e| anyhow!("invalid key {}: {}", k, e))?;
+            let k = CString::new(k.as_bytes())
+                .map_err(|e| Error::ParseError(format!("invalid key {}: {}", k, e)))?;
             model_params.as_mut().append_kv_override(k.as_c_str(), *v);
         }
 
         // Load the model
         let model = LlamaModel::load_from_file(&LLAMA_BACKEND, &params.model_path, &model_params)
-            .map_err(|e| anyhow!("unable to load model: {}", e))?;
+            .map_err(|e| Error::ModelLoadError(format!("unable to load model: {}", e)))?;
 
         Ok(Self { model })
     }
@@ -73,7 +76,9 @@ impl Model {
 
         // Create the context
         let ctx_result = self.model.new_context(&LLAMA_BACKEND, ctx_params);
-        let ctx = ctx_result.with_context(|| "unable to create the llama_context")?;
+        let ctx = ctx_result.map_err(|e| {
+            Error::ContextCreationError(format!("unable to create the llama_context: {}", e))
+        })?;
 
         // Create a batch with size 512
         let batch = llama_cpp_2::llama_batch::LlamaBatch::new(512, 1);
@@ -132,7 +137,9 @@ impl Model {
         let ctx_result = self
             .model
             .new_context(&crate::model::LLAMA_BACKEND, ctx_params);
-        let ctx_with_lifetime = ctx_result.with_context(|| "unable to create the llama_context")?;
+        let ctx_with_lifetime = ctx_result.map_err(|e| {
+            Error::ContextCreationError(format!("unable to create the llama_context: {}", e))
+        })?;
 
         // This is safe because LLAMA_BACKEND is 'static and model lives as long as the context
         let ctx = unsafe {
@@ -203,14 +210,14 @@ impl Default for ModelParams {
 pub fn parse_key_val(s: &str) -> Result<(String, ParamOverrideValue)> {
     let pos = s
         .find('=')
-        .ok_or_else(|| anyhow!("invalid KEY=value: no `=` found in `{}`", s))?;
+        .ok_or_else(|| Error::ParseError(format!("invalid KEY=value: no `=` found in `{}`", s)))?;
     let key = s[..pos].parse()?;
     let value: String = s[pos + 1..].parse()?;
     let value = i64::from_str(&value)
         .map(ParamOverrideValue::Int)
         .or_else(|_| f64::from_str(&value).map(ParamOverrideValue::Float))
         .or_else(|_| bool::from_str(&value).map(ParamOverrideValue::Bool))
-        .map_err(|_| anyhow!("must be one of i64, f64, or bool"))?;
+        .map_err(|_| Error::ParseError("must be one of i64, f64, or bool".to_string()))?;
 
     Ok((key, value))
 }

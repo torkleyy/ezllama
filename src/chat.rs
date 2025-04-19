@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{Error, Result};
 use llama_cpp_2::model::LlamaChatMessage;
 
 use crate::TextSession;
@@ -85,7 +85,9 @@ impl<'a> ChatSession<'a> {
         let formatted_prompt = match &self.template_format {
             ChatTemplateFormat::ModelDefault => {
                 // Use the model's default template
-                let template = self.session.model.model.get_chat_template()?;
+                let template = self.session.model.model.get_chat_template().map_err(|e| {
+                    Error::ChatTemplateError(format!("Failed to get chat template: {}", e))
+                })?;
                 let chat: Vec<_> = self
                     .messages
                     .iter()
@@ -100,7 +102,10 @@ impl<'a> ChatSession<'a> {
                 self.session
                     .model
                     .model
-                    .apply_chat_template(&template, &chat, true)?
+                    .apply_chat_template(&template, &chat, true)
+                    .map_err(|e| {
+                        Error::ChatTemplateError(format!("Failed to apply chat template: {}", e))
+                    })?
             }
             ChatTemplateFormat::Default => {
                 // Create a simple prompt format

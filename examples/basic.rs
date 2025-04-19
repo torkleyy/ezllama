@@ -1,4 +1,4 @@
-use anyhow::Result;
+use ezllama::Result;
 use ezllama::{Model, ModelParams};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;

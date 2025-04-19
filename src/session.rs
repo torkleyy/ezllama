@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use crate::error::{Error, Result};
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_batch::LlamaBatch;
@@ -63,7 +63,7 @@ impl<'a> TextSession<'a> {
                     AddBos::Never
                 },
             )
-            .with_context(|| format!("failed to tokenize prompt"))?;
+            .map_err(|e| Error::TokenizationError(format!("failed to tokenize prompt: {}", e)))?;
 
         let n_prompt_tokens = tokens_list.len() as i32;
         let n_ctx = self.ctx.n_ctx() as i32;
@@ -76,10 +76,11 @@ impl<'a> TextSession<'a> {
 
         // Make sure the KV cache is big enough
         if n_kv_req > n_ctx {
-            bail!(
+            return Err(Error::KVCacheSizeError(
                 "n_kv_req > n_ctx, the required kv cache size is not big enough\n\
                 either reduce n_len or increase n_ctx"
-            )
+                    .to_string(),
+            ));
         }
 
         // Clear the batch and add tokens
@@ -89,12 +90,14 @@ impl<'a> TextSession<'a> {
         for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
             // llama_decode will output logits only for the last token of the prompt
             let is_last = i == last_index;
-            self.batch.add(token, i, &[0], is_last)?;
+            self.batch
+                .add(token, i, &[0], is_last)
+                .map_err(|e| Error::BatchError(format!("Failed to add token to batch: {}", e)))?;
         }
 
         self.ctx
             .decode(&mut self.batch)
-            .with_context(|| "llama_decode() failed")?;
+            .map_err(|e| Error::DecodingError(format!("llama_decode() failed: {}", e)))?;
 
         // Main generation loop
         let mut n_cur = self.batch.n_tokens();
@@ -125,7 +128,13 @@ impl<'a> TextSession<'a> {
             }
 
             // Convert token to text and add to output
-            let output_bytes = self.model.model.token_to_bytes(token, Special::Tokenize)?;
+            let output_bytes = self
+                .model
+                .model
+                .token_to_bytes(token, Special::Tokenize)
+                .map_err(|e| {
+                    Error::TokenizationError(format!("Failed to convert token to bytes: {}", e))
+                })?;
             token_text.clear();
             let _decode_result =
                 self.decoder
@@ -135,13 +144,15 @@ impl<'a> TextSession<'a> {
 
             // Prepare for next token
             self.batch.clear();
-            self.batch.add(token, n_cur, &[0], true)?;
+            self.batch
+                .add(token, n_cur, &[0], true)
+                .map_err(|e| Error::BatchError(format!("Failed to add token to batch: {}", e)))?;
 
             n_cur += 1;
 
             self.ctx
                 .decode(&mut self.batch)
-                .with_context(|| "failed to eval")?;
+                .map_err(|e| Error::DecodingError(format!("failed to eval: {}", e)))?;
 
             n_decode += 1;
         }

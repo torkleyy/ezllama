@@ -11,13 +11,12 @@
 )]
 
 mod chat;
+mod error;
 mod model;
 mod session;
 
 // Re-export the public API
 pub use chat::{ChatMessage, ChatRole, ChatSession, ChatTemplateFormat};
+pub use error::{Error, Result};
 pub use model::{Model, ModelParams, parse_key_val};
 pub use session::TextSession;
-
-// Re-export anyhow::Result for convenience
-pub use anyhow::Result;
