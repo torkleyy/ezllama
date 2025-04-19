@@ -4,7 +4,7 @@ use llama_cpp_2::model::LlamaChatMessage;
 use crate::TextSession;
 
 /// Role for a chat message (user or assistant)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChatRole {
     /// User message
     User,
@@ -104,6 +104,8 @@ impl<'a> ChatSession<'a> {
         let start_index = self.start_index.min(self.messages.len());
         let messages = &self.messages[start_index..];
 
+        log::debug!("Formatting {} messages", messages.len());
+
         // Format the chat messages into a prompt
         let formatted_prompt = match &self.template_format {
             ChatTemplateFormat::ModelDefault => {
@@ -121,10 +123,12 @@ impl<'a> ChatSession<'a> {
                         .unwrap()
                     })
                     .collect();
+
+                let add_assistant = messages.last().map(|m| m.role) == Some(ChatRole::User);
                 self.session
                     .model
                     .model
-                    .apply_chat_template(&template, &chat, true)
+                    .apply_chat_template(&template, &chat, add_assistant)
                     .map_err(|e| {
                         Error::ChatTemplateError(format!("Failed to apply chat template: {}", e))
                     })?
@@ -148,7 +152,7 @@ impl<'a> ChatSession<'a> {
             ChatTemplateFormat::Custom(template) => {
                 // Use the custom template
                 let mut prompt = template.clone();
-                for (i, message) in self.messages.iter().enumerate() {
+                for (i, message) in messages.iter().enumerate() {
                     let role_placeholder = format!("{{{}_role}}", i);
                     let content_placeholder = format!("{{{}_content}}", i);
 

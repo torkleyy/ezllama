@@ -80,16 +80,10 @@ impl Model {
             Error::ContextCreationError(format!("unable to create the llama_context: {}", e))
         })?;
 
-        // Create a batch with size 512
-        let batch = llama_cpp_2::llama_batch::LlamaBatch::new(512, 1);
-
-        // Create a UTF-8 decoder
-        let decoder = encoding_rs::UTF_8.new_decoder();
-
         Ok(ChatSession {
             messages: Vec::new(),
             template_format: ChatTemplateFormat::ModelDefault,
-            session: TextSession::new_with_context(self, ctx, batch, decoder),
+            session: TextSession::new_with_context(self, ctx),
             start_index: 0,
         })
     }
@@ -162,25 +156,11 @@ impl Model {
         let ctx_result = self
             .model
             .new_context(&crate::model::LLAMA_BACKEND, ctx_params);
-        let ctx_with_lifetime = ctx_result.map_err(|e| {
+        let ctx = ctx_result.map_err(|e| {
             Error::ContextCreationError(format!("unable to create the llama_context: {}", e))
         })?;
 
-        // This is safe because LLAMA_BACKEND is 'static and model lives as long as the context
-        let ctx = unsafe {
-            std::mem::transmute::<
-                llama_cpp_2::context::LlamaContext<'_>,
-                llama_cpp_2::context::LlamaContext<'static>,
-            >(ctx_with_lifetime)
-        };
-
-        // Create a batch with size 512
-        let batch = llama_cpp_2::llama_batch::LlamaBatch::new(512, 1);
-
-        // Create a UTF-8 decoder
-        let decoder = encoding_rs::UTF_8.new_decoder();
-
-        Ok(TextSession::new_with_context(self, ctx, batch, decoder))
+        Ok(TextSession::new_with_context(self, ctx))
     }
 
     /// Generate text from a prompt using a one-time text session

@@ -1,9 +1,9 @@
 use crate::error::{Error, Result};
 use llama_cpp_2::context::LlamaContext;
-use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::{AddBos, Special};
-use std::time::Duration;
+use llama_cpp_2::sampling::LlamaSampler;
+use std::time::Instant;
 use tracing::{debug, info, trace};
 
 use crate::model::Model;
@@ -16,31 +16,30 @@ pub struct TextSession<'a> {
     pub(crate) model: &'a Model,
     /// The llama context for this session
     pub(crate) ctx: LlamaContext<'a>,
-    /// The batch for token processing
-    pub(crate) batch: LlamaBatch,
     /// UTF-8 decoder
     pub(crate) decoder: encoding_rs::Decoder,
+    /// The llama sampler for this session
+    pub(crate) sampler: LlamaSampler,
 }
 
 impl<'a> TextSession<'a> {
     /// Create a new text session with context
-    pub fn new_with_context(
-        model: &'a Model,
-        ctx: LlamaContext<'a>,
-        batch: LlamaBatch,
-        decoder: encoding_rs::Decoder,
-    ) -> Self {
+    pub(crate) fn new_with_context(model: &'a Model, ctx: LlamaContext<'a>) -> Self {
         Self {
             prompt: String::new(),
             model,
             ctx,
-            batch,
-            decoder,
+            decoder: encoding_rs::UTF_8.new_decoder(),
+            sampler: llama_cpp_2::sampling::LlamaSampler::chain_simple([
+                llama_cpp_2::sampling::LlamaSampler::dist(1234),
+                llama_cpp_2::sampling::LlamaSampler::greedy(),
+            ]),
         }
     }
 
     /// Add to the prompt and generate tokens
     pub fn prompt(&mut self, prompt: &str, num_tokens: i32) -> Result<String> {
+        self.prompt.clear();
         self.prompt.push_str(prompt);
         self.generate(num_tokens)
     }
@@ -71,75 +70,68 @@ impl<'a> TextSession<'a> {
         let n_kv_req = n_past + n_prompt + num_tokens;
 
         info!(
-            "num_tokens_to_generate = {}, n_prompt = {}, n_ctx = {}, k_kv_req = {}",
-            num_tokens, n_prompt, n_ctx, n_kv_req
+            "num_tokens_to_generate = {}, n_prompt = {}, n_ctx = {}, k_kv_req = {}, n_past = {}",
+            num_tokens, n_prompt, n_ctx, n_kv_req, n_past
         );
 
         // Make sure the KV cache is big enough
         if n_kv_req > n_ctx {
-            todo!("implement sliding context")
-            /*
-            let keep = n_past / 2;
+            log::info!("KV cache is full, shifting context");
+
+            let keep = n_ctx / 4;
+            let left = n_past - keep;
+            let discard = left / 2;
+
             if !self
                 .ctx
-                .clear_kv_cache_seq(None, Some(0), Some(keep as u32))
+                .clear_kv_cache_seq(
+                    Some(0),
+                    Some(keep as u32),
+                    Some(keep as u32 + discard as u32),
+                )
                 .unwrap()
             {
                 return Err(Error::KVCacheSizeError(
                     "failed to clear KV cache".to_string(),
                 ));
-            };
-            */
-        }
-
-        // Clear the batch and add tokens
-        self.batch.clear();
-
-        let last_index: i32 = (tokens_list.len() - 1) as i32;
-        for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
-            if i > 0 && i % 512 == 0 {
-                self.ctx
-                    .decode(&mut self.batch)
-                    .map_err(|e| Error::DecodingError(format!("llama_decode() failed: {}", e)))?;
-                self.batch.clear();
             }
 
-            // llama_decode will output logits only for the last token of the prompt
-            let is_last = i == last_index;
-            self.batch
-                .add(token, i, &[0], is_last)
-                .map_err(|e| Error::BatchError(format!("Failed to add token to batch: {}", e)))?;
+            log::info!("cleared from {} to {}", keep, keep + discard);
+
+            self.ctx
+                .kv_cache_seq_add(
+                    0,
+                    Some(keep as u32 + discard as u32),
+                    Some(n_past as u32),
+                    -discard as i32,
+                )
+                .unwrap();
         }
 
-        self.ctx
-            .decode(&mut self.batch)
-            .map_err(|e| Error::DecodingError(format!("llama_decode() failed: {}", e)))?;
+        // Add prompt tokens to batch
+        let mut batch = LlamaBatch::get_one(&tokens_list).map_err(|e| {
+            Error::BatchError(format!("Failed to create batch from prompt tokens: {}", e))
+        })?;
 
-        // Main generation loop
-        let mut n_cur = self.batch.n_tokens();
         let mut n_decode = 0;
         let mut output = String::new();
 
-        let t_main_start = ggml_time_us();
-
-        let mut sampler = llama_cpp_2::sampling::LlamaSampler::chain_simple([
-            llama_cpp_2::sampling::LlamaSampler::dist(1234),
-            llama_cpp_2::sampling::LlamaSampler::greedy(),
-        ]);
+        let sampling_start = Instant::now();
 
         let mut token_text = String::with_capacity(93);
 
-        let n_len = n_prompt + num_tokens;
+        while n_decode <= num_tokens {
+            self.ctx
+                .decode(&mut batch)
+                .map_err(|e| Error::DecodingError(format!("llama_decode() failed: {}", e)))?;
 
-        while n_cur <= n_len {
             // Sample the next token
-            let token = sampler.sample(&self.ctx, self.batch.n_tokens() - 1);
-
-            sampler.accept(token);
+            let token = self.sampler.sample(&self.ctx, -1);
+            self.sampler.accept(token);
 
             // Check for end of generation token
             if self.model.model.is_eog_token(token) {
-                debug!("End of generation token detected");
+                trace!("End of generation token detected: {token}");
                 break;
             }
 
@@ -158,23 +150,17 @@ impl<'a> TextSession<'a> {
             trace!(name: "token-gen", "Generated token: {}", token_text);
             output.push_str(&token_text);
 
-            // Prepare for next token
-            self.batch.clear();
-            self.batch
-                .add(token, n_cur, &[0], true)
-                .map_err(|e| Error::BatchError(format!("Failed to add token to batch: {}", e)))?;
-
-            n_cur += 1;
-
-            self.ctx
-                .decode(&mut self.batch)
-                .map_err(|e| Error::DecodingError(format!("failed to eval: {}", e)))?;
+            batch = LlamaBatch::get_one(&[token]).map_err(|e| {
+                Error::BatchError(format!(
+                    "Failed to create batch from generated token: {}",
+                    e
+                ))
+            })?;
 
             n_decode += 1;
         }
 
-        let t_main_end = ggml_time_us();
-        let duration = Duration::from_micros((t_main_end - t_main_start) as u64);
+        let duration = sampling_start.elapsed();
 
         info!(
             "decoded {} tokens in {:.2} s, speed {:.2} t/s",
