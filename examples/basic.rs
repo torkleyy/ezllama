@@ -30,16 +30,21 @@ fn main() -> Result<()> {
     // Example 1: Simple text completion using TextSession
     println!("\n=== Example 1: Text Completion with TextSession ===\n");
     let mut text_session = model.create_text_session(&model_params)?;
-    let output1 = text_session.prompt("Once upon a time", 128)?;
-    println!("Prompt: Once upon a time");
-    println!("Completion: {}\n", output1);
+    print!("7 times 7 is ");
+    for token in text_session.prompt("7 times 7 is")?.take(128) {
+        print!("{}", token);
+    }
+    println!();
 
     // Example 2: Single message chat completion using ChatSession
     println!("\n=== Example 2: Single Message Chat with ChatSession ===\n");
     let mut chat_session = model.create_chat_session(&model_params)?;
-    let chat_output = chat_session.prompt("What is Rust programming language?", 128)?;
     println!("User: What is Rust programming language?");
-    println!("Assistant: {}\n", chat_output);
+    print!("Assistant: ");
+    for token in chat_session.prompt("What is Rust programming language?")? {
+        print!("{}", token);
+    }
+    println!();
 
     // Example 3: Multi-turn conversation with default template
     println!("\n=== Example 3: Multi-turn Conversation (Default Template) ===\n");
@@ -47,12 +52,12 @@ fn main() -> Result<()> {
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
-    let response1 = chat_session.generate(128)?;
+    let response1 = chat_session.generate()?.join();
     println!("User: Hello, can you introduce yourself?");
     println!("Assistant: {}\n", response1);
 
     // Second turn
-    let response2 = chat_session.prompt("What can you help me with?", 128)?;
+    let response2 = chat_session.prompt("What can you help me with?")?.join();
     println!("User: What can you help me with?");
     println!("Assistant: {}\n", response2);
 

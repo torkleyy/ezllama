@@ -112,14 +112,10 @@ impl Model {
 
     /// Generate a chat response for a single user message
     /// This is a convenience method that creates a new chat session with a single user message
-    pub fn chat_completion(
-        &self,
-        user_message: &str,
-        num_tokens: i32,
-        params: &ModelParams,
-    ) -> Result<String> {
+    pub fn chat_completion(&self, user_message: &str, params: &ModelParams) -> Result<String> {
         self.create_chat_session(params)?
-            .prompt(user_message, num_tokens)
+            .prompt(user_message)
+            .map(|ts| ts.join())
     }
 
     /// Generate a chat response for a single user message with a system message
@@ -128,11 +124,11 @@ impl Model {
         &self,
         system_message: &str,
         user_message: &str,
-        num_tokens: i32,
         params: &ModelParams,
     ) -> Result<String> {
         self.create_chat_session_with_system(system_message, params)?
-            .prompt(user_message, num_tokens)
+            .prompt(user_message)
+            .map(|ts| ts.join())
     }
 
     /// Create a new text session
@@ -168,11 +164,10 @@ impl Model {
     pub fn text_completion(
         &mut self,
         prompt: &str,
-        num_tokens: i32,
         params: &crate::model::ModelParams,
     ) -> Result<String> {
         let mut session = self.create_text_session(params)?;
-        session.prompt(prompt, num_tokens)
+        session.prompt(prompt).map(|ts| ts.join())
     }
 }
 

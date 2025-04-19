@@ -1,4 +1,7 @@
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    session::TokenStream,
+};
 use llama_cpp_2::model::LlamaChatMessage;
 
 use crate::TextSession;
@@ -88,13 +91,13 @@ impl<'a> ChatSession<'a> {
         self.messages.last()
     }
 
-    pub fn prompt(&mut self, user_message: &str, num_tokens: i32) -> Result<String> {
+    pub fn prompt(&mut self, user_message: &str) -> Result<ChatTokenStream<'_, 'a>> {
         self.add_user_message(user_message);
-        self.generate(num_tokens)
+        self.generate()
     }
 
     /// Generate a response to the conversation
-    pub fn generate(&mut self, num_tokens: i32) -> Result<String> {
+    pub fn generate(&mut self) -> Result<ChatTokenStream<'_, 'a>> {
         if self.messages.len() == 0 {
             return Err(Error::ChatTemplateError(
                 "No messages in the chat session".to_string(),
@@ -163,12 +166,41 @@ impl<'a> ChatSession<'a> {
             }
         };
 
-        let response = self.session.prompt(&formatted_prompt, num_tokens)?;
+        Ok(ChatTokenStream {
+            ts: self.session.prompt(&formatted_prompt)?,
+            messages: &mut self.messages,
+            start_index: &mut self.start_index,
+        })
+    }
+}
 
-        self.add_assistant_message(&response);
+pub struct ChatTokenStream<'s, 'a> {
+    pub(crate) ts: TokenStream<'s, 'a>,
+    pub(crate) messages: &'s mut Vec<ChatMessage>,
+    pub(crate) start_index: &'s mut usize,
+}
 
-        self.start_index = self.messages.len();
+impl<'s, 'a> ChatTokenStream<'s, 'a> {
+    pub fn join(self) -> String {
+        self.collect::<String>()
+    }
+}
 
-        Ok(response)
+impl<'s, 'a> Iterator for ChatTokenStream<'s, 'a> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.ts.next();
+        if self.ts.n_decode() == 1 {
+            self.messages.push(ChatMessage {
+                role: ChatRole::Assistant,
+                content: String::new(),
+            });
+            *self.start_index = self.messages.len();
+        }
+        if let Some(token) = &item {
+            self.messages.last_mut().unwrap().content.push_str(token);
+        }
+        item
     }
 }

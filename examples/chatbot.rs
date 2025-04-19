@@ -49,7 +49,7 @@ fn main() -> Result<()> {
 
     // Parse optional arguments
     let mut system_message = None;
-    let mut num_tokens = 256;
+    let mut num_tokens = 2048;
     let mut ctx_size = 2048;
     #[cfg(any(feature = "cuda", feature = "vulkan"))]
     let mut disable_gpu = false;
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             }
             "--tokens" => {
                 if i + 1 < args.len() {
-                    match args[i + 1].parse::<i32>() {
+                    match args[i + 1].parse::<usize>() {
                         Ok(n) => {
                             num_tokens = n;
                             i += 2;
@@ -196,9 +196,16 @@ fn main() -> Result<()> {
         }
 
         // Generate response
-        match chat_session.prompt(input, num_tokens) {
+        match chat_session.prompt(input) {
             Ok(response) => {
-                println!("Assistant: {}", response);
+                let mut stdio = io::stderr().lock();
+                write!(stdio, "Assistant: ")?;
+                stdio.flush()?;
+                for token in response.take(num_tokens) {
+                    write!(stdio, "{}", token)?;
+                    stdio.flush()?;
+                }
+                writeln!(stdio)?;
             }
             Err(e) => {
                 eprintln!("Error generating response: {}", e);
