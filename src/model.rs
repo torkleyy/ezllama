@@ -196,6 +196,7 @@ impl Model {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ModelParams {
     /// The path to the model
     pub model_path: PathBuf,

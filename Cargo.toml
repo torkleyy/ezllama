@@ -2,6 +2,14 @@
 name = "ezllama"
 version = "0.1.0"
 edition = "2024"
+description = "An opinionated, simple Rust interface for local LLMs, powered by llama-cpp-2"
+license = "MIT"
+repository = "https://github.com/torkleyy/ezllama"
+documentation = "https://docs.rs/ezllama"
+readme = "README.md"
+keywords = ["llm", "ai", "llama", "language-model", "machine-learning"]
+categories = ["api-bindings", "science", "text-processing"]
+rust-version = "1.70.0"
 
 [dependencies]
 llama-cpp-2 = { version = "0.1.102" }
