@@ -17,7 +17,7 @@ mod session;
 // Re-export the public API
 pub use chat::{ChatMessage, ChatRole, ChatSession, ChatTemplateFormat};
 pub use model::{Model, ModelParams, parse_key_val};
-pub use session::{Session, TextSession};
+pub use session::TextSession;
 
 // Re-export anyhow::Result for convenience
 pub use anyhow::Result;

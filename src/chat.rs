@@ -2,7 +2,7 @@ use anyhow::Result;
 use llama_cpp_2::model::LlamaChatMessage;
 use tracing::debug;
 
-use crate::model::Model;
+use crate::TextSession;
 
 /// Role for a chat message (user or assistant)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,7 +50,7 @@ pub struct ChatSession<'a> {
     /// The chat template format to use
     pub template_format: ChatTemplateFormat,
     /// Reference to the model
-    pub(crate) model: &'a mut Model,
+    pub(crate) session: TextSession<'a>,
 }
 
 impl<'a> ChatSession<'a> {
@@ -86,7 +86,7 @@ impl<'a> ChatSession<'a> {
         let formatted_prompt = match &self.template_format {
             ChatTemplateFormat::ModelDefault => {
                 // Use the model's default template
-                let template = self.model.model.get_chat_template()?;
+                let template = self.session.model.model.get_chat_template()?;
                 let chat: Vec<_> = self
                     .messages
                     .iter()
@@ -98,7 +98,8 @@ impl<'a> ChatSession<'a> {
                         .unwrap()
                     })
                     .collect();
-                self.model
+                self.session
+                    .model
                     .model
                     .apply_chat_template(&template, &chat, true)?
             }
@@ -132,10 +133,8 @@ impl<'a> ChatSession<'a> {
 
         debug!("Chat prompt: {}", formatted_prompt);
 
-        // Generate the response
-        let response = self.model.generate(&formatted_prompt, num_tokens)?;
+        let response = self.session.prompt(&formatted_prompt, num_tokens)?;
 
-        // Add the response to the chat session
         self.add_assistant_message(&response);
 
         Ok(response)
