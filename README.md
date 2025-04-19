@@ -30,7 +30,7 @@ Add ezllama to your Cargo.toml:
 
 ```toml
 [dependencies]
-ezllama = "0.1.0"
+ezllama = "*"
 ```
 
 For GPU acceleration, enable the appropriate feature
@@ -38,11 +38,11 @@ For GPU acceleration, enable the appropriate feature
 
 ```toml
 [dependencies]
-ezllama = { version = "0.1.0", features = ["cuda"] }  # For CUDA support
+ezllama = { version = "*", features = ["cuda"] }  # For CUDA support
 # or
-ezllama = { version = "0.1.0", features = ["metal"] }  # For Metal support (macOS)
+ezllama = { version = "*", features = ["metal"] }  # For Metal support (macOS)
 # or
-ezllama = { version = "0.1.0", features = ["vulkan"] }  # For Vulkan support
+ezllama = { version = "*", features = ["vulkan"] }  # For Vulkan support
 ```
 
 ## Quick Start

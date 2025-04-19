@@ -64,9 +64,10 @@ impl<'s, 'a> Iterator for TokenStream<'s, 'a> {
             .session
             .model
             .model
-            .token_to_str(token, Special::Tokenize)
+            .token_to_bytes(token, Special::Tokenize)
         {
             Ok(text) => {
+                let text = String::from_utf8_lossy(&text).into_owned();
                 trace!(name: "token-gen", "Generated token: {}", text);
                 text
             }
