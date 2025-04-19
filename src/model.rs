@@ -17,7 +17,7 @@ use crate::chat::{ChatSession, ChatTemplateFormat};
 // Initialize the LlamaBackend globally
 lazy_static! {
     pub static ref LLAMA_BACKEND: LlamaBackend = {
-        send_logs_to_tracing(LogOptions::default().with_logs_enabled(true));
+        send_logs_to_tracing(LogOptions::default().with_logs_enabled(false));
         LlamaBackend::init()
             .map_err(|e| Error::BackendInitError(e.to_string()))
             .expect("Failed to initialize LlamaBackend")

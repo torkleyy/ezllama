@@ -116,7 +116,7 @@ let mut chat_session = model.create_chat_session_with_template(template.to_strin
 
 ## License
 
-Dual-licensed under MIT and Apache 2.0.
+Licensed under MIT.
 
 ## Contribution
 
