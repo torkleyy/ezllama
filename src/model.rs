@@ -50,7 +50,10 @@ impl Model {
         for (k, v) in &params.key_value_overrides {
             let k = CString::new(k.as_bytes())
                 .map_err(|e| Error::ParseError(format!("invalid key {}: {}", k, e)))?;
-            model_params.as_mut().append_kv_override(k.as_c_str(), *v);
+            let v = param_override(v).map_err(|e| {
+                Error::ParseError(format!("invalid value {} for key {k:?}: {}", v, e))
+            })?;
+            model_params.as_mut().append_kv_override(k.as_c_str(), v);
         }
 
         // Load the model
@@ -61,28 +64,14 @@ impl Model {
     }
 
     /// Create a new chat session with this model
-    pub fn create_chat_session<'a>(&'a self, params: &ModelParams) -> Result<ChatSession<'a>> {
-        // Initialize the context
-        let mut ctx_params = llama_cpp_2::context::params::LlamaContextParams::default()
-            .with_n_ctx(params.ctx_size.or(Some(NonZeroU32::new(2048).unwrap())));
-
-        if let Some(threads) = params.threads {
-            ctx_params = ctx_params.with_n_threads(threads);
-        }
-        if let Some(threads_batch) = params.threads_batch.or(params.threads) {
-            ctx_params = ctx_params.with_n_threads_batch(threads_batch);
-        }
-
-        // Create the context
-        let ctx_result = self.model.new_context(&LLAMA_BACKEND, ctx_params);
-        let ctx = ctx_result.map_err(|e| {
-            Error::ContextCreationError(format!("unable to create the llama_context: {}", e))
-        })?;
-
+    pub fn create_chat_session<'a>(
+        &'a self,
+        context_params: &ContextParams,
+    ) -> Result<ChatSession<'a>> {
         Ok(ChatSession {
             messages: Vec::new(),
             template_format: ChatTemplateFormat::ModelDefault,
-            session: TextSession::new_with_context(self, ctx),
+            session: self.create_text_session(context_params)?,
             start_index: 0,
         })
     }
@@ -91,9 +80,9 @@ impl Model {
     pub fn create_chat_session_with_template(
         &self,
         template: String,
-        params: &ModelParams,
+        context_params: &ContextParams,
     ) -> Result<ChatSession> {
-        let mut session = self.create_chat_session(params)?;
+        let mut session = self.create_chat_session(context_params)?;
         session.template_format = ChatTemplateFormat::Custom(template);
         Ok(session)
     }
@@ -102,17 +91,21 @@ impl Model {
     pub fn create_chat_session_with_system(
         &self,
         system_message: &str,
-        params: &ModelParams,
+        context_params: &ContextParams,
     ) -> Result<ChatSession> {
-        let mut session = self.create_chat_session(params)?;
+        let mut session = self.create_chat_session(context_params)?;
         session.add_system_message(system_message);
         Ok(session)
     }
 
     /// Generate a chat response for a single user message
     /// This is a convenience method that creates a new chat session with a single user message
-    pub fn chat_completion(&self, user_message: &str, params: &ModelParams) -> Result<String> {
-        self.create_chat_session(params)?
+    pub fn chat_completion(
+        &self,
+        user_message: &str,
+        context_params: &ContextParams,
+    ) -> Result<String> {
+        self.create_chat_session(context_params)?
             .prompt(user_message)
             .map(|ts| ts.join())
     }
@@ -123,28 +116,29 @@ impl Model {
         &self,
         system_message: &str,
         user_message: &str,
-        params: &ModelParams,
+        context_params: &ContextParams,
     ) -> Result<String> {
-        self.create_chat_session_with_system(system_message, params)?
+        self.create_chat_session_with_system(system_message, context_params)?
             .prompt(user_message)
             .map(|ts| ts.join())
     }
 
     /// Create a new text session
-    pub fn create_text_session(&self, params: &crate::model::ModelParams) -> Result<TextSession> {
+    pub fn create_text_session(&self, context_params: &ContextParams) -> Result<TextSession> {
         // Initialize the context
         let mut ctx_params = llama_cpp_2::context::params::LlamaContextParams::default()
             .with_n_ctx(
-                params
+                context_params
                     .ctx_size
-                    .or(Some(std::num::NonZeroU32::new(2048).unwrap())),
+                    .map(|n| n as u32)
+                    .and_then(NonZeroU32::new),
             );
 
-        if let Some(threads) = params.threads {
-            ctx_params = ctx_params.with_n_threads(threads);
+        if let Some(threads) = context_params.threads {
+            ctx_params = ctx_params.with_n_threads(threads as i32);
         }
-        if let Some(threads_batch) = params.threads_batch.or(params.threads) {
-            ctx_params = ctx_params.with_n_threads_batch(threads_batch);
+        if let Some(threads_batch) = context_params.threads_batch.or(context_params.threads) {
+            ctx_params = ctx_params.with_n_threads_batch(threads_batch as i32);
         }
 
         // Create the context
@@ -163,46 +157,47 @@ impl Model {
     pub fn text_completion(
         &mut self,
         prompt: &str,
-        params: &crate::model::ModelParams,
+        context_params: &ContextParams,
     ) -> Result<String> {
-        let mut session = self.create_text_session(params)?;
+        let mut session = self.create_text_session(context_params)?;
         session.prompt(prompt).map(|ts| ts.join())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct ModelParams {
     /// The path to the model
     pub model_path: PathBuf,
     /// override some parameters of the model
-    pub key_value_overrides: Vec<(String, ParamOverrideValue)>,
+    pub key_value_overrides: Vec<(String, String)>,
     /// Disable offloading layers to the gpu
-    #[cfg(any(feature = "cuda", feature = "vulkan"))]
     pub disable_gpu: bool,
-    /// RNG seed (default: 1234)
-    pub seed: Option<u32>,
-    /// number of threads to use during generation (default: use all available threads)
-    pub threads: Option<i32>,
-    /// number of threads to use during batch and prompt processing (default: use all available threads)
-    pub threads_batch: Option<i32>,
-    /// size of the prompt context (default: loaded from the model)
-    pub ctx_size: Option<NonZeroU32>,
     #[doc(hidden)]
     pub _non_exhaustive: (),
 }
 
-impl Default for ModelParams {
-    fn default() -> Self {
-        Self {
-            model_path: PathBuf::new(),
-            key_value_overrides: Vec::new(),
-            #[cfg(any(feature = "cuda", feature = "vulkan"))]
-            disable_gpu: false,
-            seed: None,
-            threads: None,
-            threads_batch: None,
-            ctx_size: None,
-            _non_exhaustive: (),
-        }
-    }
+/// Parameters for creating a context
+#[derive(Debug, Default, Clone)]
+pub struct ContextParams {
+    /// RNG seed (default: 1234)
+    pub seed: Option<u32>,
+    /// number of threads to use during generation (default: use all available threads)
+    pub threads: Option<usize>,
+    /// number of threads to use during batch and prompt processing (default: use all available threads)
+    pub threads_batch: Option<usize>,
+    /// size of the prompt context (default: loaded from the model)
+    pub ctx_size: Option<usize>,
+    #[doc(hidden)]
+    pub _non_exhaustive: (),
+}
+
+// Helper function to parse key-value pairs for model parameters
+fn param_override(s: &str) -> Result<ParamOverrideValue> {
+    use std::str::FromStr;
+
+    i64::from_str(s)
+        .map(ParamOverrideValue::Int)
+        .or_else(|_| f64::from_str(s).map(ParamOverrideValue::Float))
+        .or_else(|_| bool::from_str(s).map(ParamOverrideValue::Bool))
+        .map_err(|_| Error::ParseError("must be one of i64, f64, or bool".to_string()))
 }

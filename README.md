@@ -50,7 +50,7 @@ ezllama = { version = "0.1.0", features = ["vulkan"] }  # For Vulkan support
 **Note:** Make sure you grab a GGUF model from Hugging Face or elsewhere.
 
 ```rust
-use ezllama::{Model, ModelParams, Result};
+use ezllama::{ContextParams, Model, ModelParams, Result};
 use std::path::PathBuf;
 
 fn main() -> Result<()> {
@@ -59,10 +59,14 @@ fn main() -> Result<()> {
         model_path: PathBuf::from("path/to/your/model.gguf"),
         ..Default::default()
     };
+    let context_params = ContextParams {
+        ctx_size: Some(2048),
+        ..Default::default()
+    };
 
     let model = Model::new(&model_params)?;
 
-    let mut chat_session = model.create_chat_session(&model_params)?;
+    let mut chat_session = model.create_chat_session(&context_params)?;
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
@@ -88,7 +92,7 @@ fn main() -> Result<()> {
 
 ```rust
 // Create a text session for text completion
-let mut text_session = model.create_text_session(&model_params)?;
+let mut text_session = model.create_text_session(&context_params)?;
 let output = text_session.prompt("Once upon a time")?.join();
 
 // Continue generating from the existing context
@@ -101,18 +105,18 @@ let more_output = text_session.prompt(" and then")?.join();
 // Create a chat session with a system message
 let mut chat_session = model.create_chat_session_with_system(
     "You are a helpful assistant that specializes in Rust programming.",
-    &model_params
+    &context_params
 )?;
 
 // Or add a system message to an existing session
-let mut chat_session = model.create_chat_session(&model_params)?;
+let mut chat_session = model.create_chat_session(&context_params)?;
 chat_session.add_system_message("You are a helpful assistant.");
 
 // One-shot completion with system message
 let response = model.chat_completion_with_system(
     "You are a concise assistant.",
     "Explain quantum computing.",
-    &model_params
+    &context_params
 )?.join();
 ```
 
@@ -121,7 +125,7 @@ let response = model.chat_completion_with_system(
 ```rust
 // Create a chat session with a custom template
 let template = "{{0_role}}: {{0_content}}\n{{1_role}}: {{1_content}}";
-let mut chat_session = model.create_chat_session_with_template(template.to_string(), &model_params)?;
+let mut chat_session = model.create_chat_session_with_template(template.to_string(), &context_params)?;
 ```
 
 ## License

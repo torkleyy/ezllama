@@ -138,7 +138,7 @@ impl<'a> TextSession<'a> {
     pub fn generate(&mut self) -> Result<TokenStream<'_, 'a>> {
         debug!("Text prompt: {}", self.prompt);
 
-        let n_past = self.ctx.get_kv_cache_used_cells() as i32;
+        let n_past = self.ctx.get_kv_cache_used_cells();
         let is_first = n_past == 0;
         let add_bos = if is_first {
             AddBos::Always
@@ -189,7 +189,7 @@ impl<'a> TextSession<'a> {
 
 fn slide_cache(ctx: &mut LlamaContext, n_tokens: i32) -> Result<()> {
     let n_ctx = ctx.n_ctx() as i32;
-    let n_past = ctx.get_kv_cache_used_cells() as i32;
+    let n_past = ctx.get_kv_cache_used_cells();
     if n_past + n_tokens > n_ctx {
         log::info!("KV cache is full, shifting context");
         let keep = n_ctx / 4; // tokens (at start) to keep
@@ -211,7 +211,7 @@ fn slide_cache(ctx: &mut LlamaContext, n_tokens: i32) -> Result<()> {
             0,
             Some(keep as u32 + discard as u32),
             Some(n_past as u32),
-            -discard as i32,
+            -discard,
         )
         .unwrap();
 

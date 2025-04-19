@@ -98,7 +98,7 @@ impl<'a> ChatSession<'a> {
 
     /// Generate a response to the conversation
     pub fn generate(&mut self) -> Result<ChatTokenStream<'_, 'a>> {
-        if self.messages.len() == 0 {
+        if self.messages.is_empty() {
             return Err(Error::ChatTemplateError(
                 "No messages in the chat session".to_string(),
             ));

@@ -1,5 +1,5 @@
 use ezllama::Result;
-use ezllama::{Model, ModelParams};
+use ezllama::{ContextParams, Model, ModelParams};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -25,11 +25,14 @@ fn main() -> Result<()> {
         ..Default::default()
     };
 
+    // Initialize context parameters
+    let context_params = ContextParams::default();
+
     let model = Model::new(&model_params)?;
 
     // Example 1: Simple text completion using TextSession
     println!("\n=== Example 1: Text Completion with TextSession ===\n");
-    let mut text_session = model.create_text_session(&model_params)?;
+    let mut text_session = model.create_text_session(&context_params)?;
     print!("7 times 7 is ");
     for token in text_session.prompt("7 times 7 is")?.take(128) {
         print!("{}", token);
@@ -38,7 +41,7 @@ fn main() -> Result<()> {
 
     // Example 2: Single message chat completion using ChatSession
     println!("\n=== Example 2: Single Message Chat with ChatSession ===\n");
-    let mut chat_session = model.create_chat_session(&model_params)?;
+    let mut chat_session = model.create_chat_session(&context_params)?;
     println!("User: What is Rust programming language?");
     print!("Assistant: ");
     for token in chat_session.prompt("What is Rust programming language?")? {
@@ -48,7 +51,7 @@ fn main() -> Result<()> {
 
     // Example 3: Multi-turn conversation with default template
     println!("\n=== Example 3: Multi-turn Conversation (Default Template) ===\n");
-    let mut chat_session = model.create_chat_session(&model_params)?;
+    let mut chat_session = model.create_chat_session(&context_params)?;
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");

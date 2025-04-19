@@ -1,6 +1,5 @@
-use ezllama::{Model, ModelParams, Result};
+use ezllama::{ContextParams, Model, ModelParams, Result};
 use std::io::{self, Write};
-use std::num::NonZeroU32;
 use std::path::PathBuf;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, fmt};
@@ -37,7 +36,7 @@ fn main() -> Result<()> {
         eprintln!("Usage: {} <model_path> [options]", args[0]);
         eprintln!("Options:");
         eprintln!("  --system \"<system message>\"  Set a system message");
-        eprintln!("  --tokens <number>           Number of tokens to generate (default: 256)");
+        eprintln!("  --tokens <number>           Number of tokens to generate (default: 10000)");
         eprintln!("  --ctx-size <number>         Context size (default: 2048)");
         eprintln!("  --disable-gpu               Disable GPU acceleration");
         eprintln!("  --verbose, -v               Enable verbose logging");
@@ -49,7 +48,7 @@ fn main() -> Result<()> {
 
     // Parse optional arguments
     let mut system_message = None;
-    let mut num_tokens = 2048;
+    let mut num_tokens = 10_000;
     let mut ctx_size = 2048;
     #[cfg(any(feature = "cuda", feature = "vulkan"))]
     let mut disable_gpu = false;
@@ -85,7 +84,7 @@ fn main() -> Result<()> {
             }
             "--ctx-size" => {
                 if i + 1 < args.len() {
-                    match args[i + 1].parse::<u32>() {
+                    match args[i + 1].parse::<usize>() {
                         Ok(n) => {
                             ctx_size = n;
                             i += 2;
@@ -121,7 +120,12 @@ fn main() -> Result<()> {
         model_path,
         #[cfg(any(feature = "cuda", feature = "vulkan"))]
         disable_gpu,
-        ctx_size: NonZeroU32::new(ctx_size),
+        ..Default::default()
+    };
+
+    // Initialize context parameters
+    let context_params = ContextParams {
+        ctx_size: Some(ctx_size),
         ..Default::default()
     };
 
@@ -142,9 +146,9 @@ fn main() -> Result<()> {
     // Create a chat session
     let mut chat_session = if let Some(ref system) = system_message {
         println!("Using system message: {}", system);
-        model.create_chat_session_with_system(system, &model_params)?
+        model.create_chat_session_with_system(system, &context_params)?
     } else {
-        model.create_chat_session(&model_params)?
+        model.create_chat_session(&context_params)?
     };
 
     // Welcome message
@@ -176,9 +180,9 @@ fn main() -> Result<()> {
         if input.eq_ignore_ascii_case("clear") {
             // Create a new chat session
             chat_session = if let Some(ref system) = system_message {
-                model.create_chat_session_with_system(system, &model_params)?
+                model.create_chat_session_with_system(system, &context_params)?
             } else {
-                model.create_chat_session(&model_params)?
+                model.create_chat_session(&context_params)?
             };
             println!("Conversation cleared!");
             continue;
@@ -187,7 +191,7 @@ fn main() -> Result<()> {
         // Check for system message command
         if input.starts_with("system:") {
             let system_msg = input.trim_start_matches("system:").trim();
-            chat_session = model.create_chat_session_with_system(system_msg, &model_params)?;
+            chat_session = model.create_chat_session_with_system(system_msg, &context_params)?;
             println!(
                 "Created new chat session with system message: {}",
                 system_msg
