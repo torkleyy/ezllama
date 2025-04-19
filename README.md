@@ -12,6 +12,7 @@ An opinionated, simple Rust interface for local LLMs, powered by [llama-cpp-2](h
 
 - **Simple API**: Designed for ease of use with a clean, intuitive interface
 - **Text and Chat Completion**: Support for both text and chat completion tasks
+* **Infinite token generation**: Automatically manages the cache for infinite token generation
 - **Tracing Integration**: Built-in logging via the tracing ecosystem
 
 Right now it only supports the basics, but I might add more features in the future
@@ -57,11 +58,15 @@ fn main() -> Result<()> {
 
     // First turn
     chat_session.add_user_message("Hello, can you introduce yourself?");
-    let response1 = chat_session.generate(128)?;
-    println!("Assistant: {}", response1);
+    let response1 = chat_session.generate()?.take(128);
+    print!("Assistant: ");
+    for token in response1 {
+        print!("{}", token);
+        std::io::stdout().flush()?;
+    }
 
     // Second turn (can do the same in one step)
-    let response2 = chat_session.prompt("What can you help me with?", 128)?;
+    let response2 = chat_session.prompt("What can you help me with?")?.join();
     println!("Assistant: {}", response2);
 
     Ok(())
@@ -72,16 +77,14 @@ fn main() -> Result<()> {
 
 ### Text completion
 
-**Note:** Many models struggle with continuing from a second prompt
-in the same context.
 
 ```rust
 // Create a text session for text completion
 let mut text_session = model.create_text_session(&model_params)?;
-let output = text_session.prompt("Once upon a time", 128)?;
+let output = text_session.prompt("Once upon a time")?.join();
 
 // Continue generating from the existing context
-let more_output = text_session.prompt(" and then", 128)?;
+let more_output = text_session.prompt(" and then")?.join();
 ```
 
 ### System Messages
@@ -101,9 +104,8 @@ chat_session.add_system_message("You are a helpful assistant.");
 let response = model.chat_completion_with_system(
     "You are a concise assistant.",
     "Explain quantum computing.",
-    256,
     &model_params
-)?;
+)?.join();
 ```
 
 ### Custom Chat Templates
