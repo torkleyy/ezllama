@@ -18,6 +18,12 @@ An opinionated, simple Rust interface for local LLMs, powered by [llama-cpp-2](h
 Right now it only supports the basics, but I might add more features in the future
 as I need them.
 
+You can try out the chatbot from this repo:
+
+```sh
+cargo run --example chatbot --features <backend> -- model.gguf
+```
+
 ## Installation
 
 Add ezllama to your Cargo.toml:
@@ -40,6 +46,8 @@ ezllama = { version = "0.1.0", features = ["vulkan"] }  # For Vulkan support
 ```
 
 ## Quick Start
+
+**Note:** Make sure you grab a GGUF model from Hugging Face or elsewhere.
 
 ```rust
 use ezllama::{Model, ModelParams, Result};
