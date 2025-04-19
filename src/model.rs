@@ -9,7 +9,6 @@ use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::pin::pin;
-use std::str::FromStr;
 
 use crate::TextSession;
 use crate::chat::{ChatSession, ChatTemplateFormat};
@@ -206,20 +205,4 @@ impl Default for ModelParams {
             _non_exhaustive: (),
         }
     }
-}
-
-// Helper function to parse key-value pairs for model parameters
-pub fn parse_key_val(s: &str) -> Result<(String, ParamOverrideValue)> {
-    let pos = s
-        .find('=')
-        .ok_or_else(|| Error::ParseError(format!("invalid KEY=value: no `=` found in `{}`", s)))?;
-    let key = s[..pos].parse()?;
-    let value: String = s[pos + 1..].parse()?;
-    let value = i64::from_str(&value)
-        .map(ParamOverrideValue::Int)
-        .or_else(|_| f64::from_str(&value).map(ParamOverrideValue::Float))
-        .or_else(|_| bool::from_str(&value).map(ParamOverrideValue::Bool))
-        .map_err(|_| Error::ParseError("must be one of i64, f64, or bool".to_string()))?;
-
-    Ok((key, value))
 }
