@@ -26,7 +26,8 @@ Add ezllama to your Cargo.toml:
 ezllama = "0.1.0"
 ```
 
-For GPU acceleration, enable the appropriate feature:
+For GPU acceleration, enable the appropriate feature
+(if you are using CUDA, go run some errands when compiling):
 
 ```toml
 [dependencies]
