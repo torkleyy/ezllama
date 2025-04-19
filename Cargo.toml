@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["llm", "ai", "llama", "language-model", "machine-learning"]
 categories = ["api-bindings", "science", "text-processing"]
 rust-version = "1.70.0"
+include = ["src/**/*", "examples/**/*", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 llama-cpp-2 = { version = "0.1.102" }
