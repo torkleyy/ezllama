@@ -1,6 +1,5 @@
 use anyhow::Result;
 use llama_cpp_2::model::LlamaChatMessage;
-use tracing::debug;
 
 use crate::TextSession;
 
@@ -130,8 +129,6 @@ impl<'a> ChatSession<'a> {
                 prompt
             }
         };
-
-        debug!("Chat prompt: {}", formatted_prompt);
 
         let response = self.session.prompt(&formatted_prompt, num_tokens)?;
 
