@@ -14,9 +14,11 @@ mod chat;
 mod error;
 mod model;
 mod session;
+mod tool;
 
 // Re-export the public API
 pub use chat::{ChatMessage, ChatRole, ChatSession, ChatTemplateFormat};
 pub use error::{Error, Result};
 pub use model::{ContextParams, Model, ModelParams};
 pub use session::TextSession;
+pub use tool::{FunctionTool, Tool, ToolCollection, function_tool};
