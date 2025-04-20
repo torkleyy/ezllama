@@ -1,6 +1,5 @@
 use crate::error::{Error, Result};
-use schemars::JsonSchema;
-use schemars::schema::RootSchema;
+use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
@@ -16,7 +15,7 @@ pub trait Tool: Send + Sync {
     fn description(&self) -> &str;
 
     /// The JSON schema for the tool's parameters.
-    fn parameters_schema(&self) -> RootSchema;
+    fn parameters_schema(&self) -> Schema;
 
     /// Call the tool with the given parameters.
     ///
@@ -89,7 +88,7 @@ where
         &self.description
     }
 
-    fn parameters_schema(&self) -> RootSchema {
+    fn parameters_schema(&self) -> Schema {
         schemars::schema_for!(T)
     }
 
