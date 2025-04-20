@@ -1,5 +1,0 @@
-- write simple, elegant, efficient code
-- don't use dependencies if you can easily avoid it
-- don't overengineer stuff - don't make object-oriented structs unless it helps the readability
-- write comments and documentation, not to repeat yourself, but to explain the intent of the code
-- this should be done by researching how (non-explanatory) functions work and then commenting the piece of information that is required (because intuitive understanding fails)

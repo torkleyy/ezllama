@@ -20,6 +20,7 @@ fn main() -> Result<()> {
         .init();
 
     // Initialize the model
+    // This one is from https://huggingface.co/crusoeai/Arcee-Agent-GGUF/blob/main/arcee-agent.Q4_1.gguf
     let model_params = ModelParams {
         model_path: PathBuf::from("arcee-agent.Q4_1.gguf"),
         ..Default::default()
